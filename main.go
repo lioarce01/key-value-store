@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	"golang.org/x/time/rate"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +17,7 @@ func setHandler(c *gin.Context) {
 	key := c.Query("key")
 	value := c.Query("value")
 
-	if key == "" || key == "" {
+	if key == "" || value == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "key and value are required"})
 		return
 	}
@@ -63,12 +65,11 @@ func deleteHandler(c *gin.Context) {
 
 // KEYS handler
 func keysHandler(c *gin.Context) {
-	keys := make([]string, 0)
-	store.Range(func(key, value interface{}) bool {
-		keys = append(keys, key.(string))
+	var keys []string
+	store.Range(func(k, v interface{}) bool {
+		keys = append(keys, k.(string))
 		return true
 	})
-
 	c.JSON(http.StatusOK, gin.H{"keys": keys})
 }
 
@@ -77,8 +78,21 @@ func healthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "OK"})
 }
 
+// RATE LIMITER
+var limiter = rate.NewLimiter(1, 5)
+
+func rateMiddleware(c *gin.Context) {
+	if limiter.Allow() == false {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+		c.Abort()
+		return
+	}
+	c.Next()
+}
+
 func main() {
 	r := gin.Default()
+	r.Use(rateMiddleware)
 
 	r.GET("/set", setHandler)
 	r.GET("/get", getHandler)
