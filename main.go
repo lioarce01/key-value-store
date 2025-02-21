@@ -82,7 +82,7 @@ func healthHandler(c *gin.Context) {
 var limiter = rate.NewLimiter(1, 5)
 
 func rateMiddleware(c *gin.Context) {
-	if limiter.Allow() == false {
+	if !limiter.Allow() {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
 		c.Abort()
 		return
